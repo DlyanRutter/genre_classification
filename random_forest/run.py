@@ -3,7 +3,7 @@ import argparse
 import itertools
 import logging
 import os
-
+import setuptools
 import yaml
 import tempfile
 import mlflow
@@ -13,7 +13,7 @@ from mlflow.models import infer_signature
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import roc_auc_score, plot_confusion_matrix
+from sklearn.metrics import roc_auc_score, ConfusionMatrixDisplay
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler, FunctionTransformer
 import matplotlib.pyplot as plt
@@ -72,7 +72,7 @@ def go(args):
     fig_feat_imp = plot_feature_importance(pipe)
 
     fig_cm, sub_cm = plt.subplots(figsize=(10, 10))
-    plot_confusion_matrix(
+    ConfusionMatrixDisplay.from_estimator(
         pipe,
         X_val[used_columns],
         y_val,
@@ -96,7 +96,12 @@ def export_model(run, pipe, used_columns, X_val, val_pred, export_artifact):
     # Infer the signature of the model
 
     # Get the columns that we are really using from the pipeline
-    signature = infer_signature(X_val[used_columns], val_pred)
+    signature_run = wandb.init(project="exercise_6")
+    signature_artifact = signature_run.use_artifact(
+        'dylan-rutter/exercise_6/data_train.csv:latest', type="raw_data").file()
+    signature = pd.read_csv(signature_artifact, low_memory=False)
+    input_example = list(signature.iloc[2])
+    #signature = infer_signature(signature[used_columns], val_pred) ##########I added this
 
     with tempfile.TemporaryDirectory() as temp_dir:
 
@@ -104,11 +109,11 @@ def export_model(run, pipe, used_columns, X_val, val_pred, export_artifact):
 
         mlflow.sklearn.save_model(
             pipe,
-            export_path,
-            serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
-            signature=signature,
-            input_example=X_val.iloc[:2],
-        )
+            path=export_path,
+            serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE)
+        #    signature=signature,
+        #    input_example=input_example,
+        #)
 
         artifact = wandb.Artifact(
             export_artifact,

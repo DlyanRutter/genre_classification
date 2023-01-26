@@ -6,7 +6,7 @@ import pandas as pd
 import wandb
 import mlflow.sklearn
 import matplotlib.pyplot as plt
-from sklearn.metrics import roc_auc_score, plot_confusion_matrix
+from sklearn.metrics import roc_auc_score, ConfusionMatrixDisplay
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
 logger = logging.getLogger()
@@ -30,8 +30,8 @@ def go(args):
 
     pipe = mlflow.sklearn.load_model(model_export_path)
 
-    used_columns = list(itertools.chain.from_iterable([x[2] for x in pipe['preprocessor'].transformers]))
-    pred_proba = pipe.predict_proba(X_test[used_columns])
+    #used_columns = list(itertools.chain.from_iterable([x[2] for x in pipe['preprocessor'].transformers]))
+    pred_proba = pipe.predict_proba(X_test)#[used_columns])
 
     logger.info("Scoring")
     score = roc_auc_score(y_test, pred_proba, average="macro", multi_class="ovo")
@@ -40,9 +40,9 @@ def go(args):
 
     logger.info("Computing confusion matrix")
     fig_cm, sub_cm = plt.subplots(figsize=(10, 10))
-    plot_confusion_matrix(
+    ConfusionMatrixDisplay.from_estimator(
         pipe,
-        X_test[used_columns],
+        X_test,
         y_test,
         ax=sub_cm,
         normalize="true",

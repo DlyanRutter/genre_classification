@@ -91,41 +91,24 @@ def go(args):
     )
 
 
-def export_model(run, pipe, used_columns, X_val, val_pred, export_artifact):
-
-    # Infer the signature of the model
-
-    # Get the columns that we are really using from the pipeline
-    signature_run = wandb.init(project="exercise_6")
-    signature_artifact = signature_run.use_artifact(
+def export_model(run, pipe, X_val, val_pred, export_artifact):
+    signature_run = wandb.init(project="exercise_6") # Get train data artifact
+    signature_artifact = signature_run.use_artifact( # Make signature from data
         'dylan-rutter/exercise_6/data_train.csv:latest', type="raw_data").file()
-    signature = pd.read_csv(signature_artifact, low_memory=False)
-    input_example = list(signature.iloc[2])
-    #signature = infer_signature(signature[used_columns], val_pred) ##########I added this
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-
-        export_path = os.path.join(temp_dir, "model_export")
-
-        mlflow.sklearn.save_model(
-            pipe,
-            path=export_path,
+    df = pd.read_csv(signature_artifact, low_memory=False)
+    for c in df.columns:
+        if df[c].dtype == int:
+            df[c] = df[c].astype('float64')
+    input_example = list(df.iloc[2]) # make an input example from td column
+    signature=infer_signature(df, val_pred)
+    with tempfile.TemporaryDirectory() as temp_dir: # use temporary file
+        export_path = os.path.join(temp_dir, "model_export") # make file in temp path
+        mlflow.sklearn.save_model(pipe, path=export_path, signature=signature,
+            input_example=input_example, 
             serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE)
-        #    signature=signature,
-        #    input_example=input_example,
-        #)
-
-        artifact = wandb.Artifact(
-            export_artifact,
-            type="model_export",
-            description="Random Forest pipeline export",
-        )
+        artifact=wandb.Artifact(export_artifact, type="model_export", description="RFC pipe")
         artifact.add_dir(export_path)
-
         run.log_artifact(artifact)
-
-        # Make sure the artifact is uploaded before the temp dir
-        # gets deleted
         artifact.wait()
 
 
